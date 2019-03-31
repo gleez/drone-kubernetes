@@ -19,6 +19,7 @@ import (
 
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -53,6 +54,7 @@ type (
 		Token     string
 		Namespace string
 		Template  string
+		InCluster bool
 	}
 
 	Plugin struct {
@@ -65,15 +67,18 @@ type (
 
 func (p Plugin) Exec() error {
 
-	if p.Config.Server == "" {
-		log.Fatal("KUBERNETES_SERVER is not defined")
+	if !p.Config.InCluster {
+		if p.Config.Server == "" {
+			log.Fatal("KUBERNETES_SERVER is not defined")
+		}
+		if p.Config.Token == "" {
+			log.Fatal("KUBERNETES_TOKEN is not defined")
+		}
+		if p.Config.Cert == "" {
+			log.Fatal("KUBERNETES_CERT is not defined")
+		}
 	}
-	if p.Config.Token == "" {
-		log.Fatal("KUBERNETES_TOKEN is not defined")
-	}
-	if p.Config.Cert == "" {
-		log.Fatal("KUBERNETES_CERT is not defined")
-	}
+
 	if p.Config.Namespace == "" {
 		p.Config.Namespace = "default"
 	}
@@ -262,31 +267,41 @@ func (p Plugin) Exec() error {
 }
 
 func (p Plugin) getClient() (*kubernetes.Clientset, error) {
+	var cfg *rest.Config
+	var err error
 
-	cert, err := base64.StdEncoding.DecodeString(p.Config.Cert)
-	config := clientcmdapi.NewConfig()
-	config.Clusters["drone"] = &clientcmdapi.Cluster{
-		Server: p.Config.Server,
-		CertificateAuthorityData: cert,
+	if !p.Config.InCluster {
+		cert, err := base64.StdEncoding.DecodeString(p.Config.Cert)
+		config := clientcmdapi.NewConfig()
+		config.Clusters["drone"] = &clientcmdapi.Cluster{
+			Server:                   p.Config.Server,
+			CertificateAuthorityData: cert,
+		}
+		config.AuthInfos["drone"] = &clientcmdapi.AuthInfo{
+			Token: p.Config.Token,
+		}
+
+		config.Contexts["drone"] = &clientcmdapi.Context{
+			Cluster:  "drone",
+			AuthInfo: "drone",
+		}
+
+		config.CurrentContext = "drone"
+
+		clientBuilder := clientcmd.NewNonInteractiveClientConfig(*config, "drone", &clientcmd.ConfigOverrides{}, nil)
+		cfg, err = clientBuilder.ClientConfig()
+		if err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		// creates the in-cluster config
+		cfg, err = rest.InClusterConfig()
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
-	config.AuthInfos["drone"] = &clientcmdapi.AuthInfo{
-		Token: p.Config.Token,
-	}
 
-	config.Contexts["drone"] = &clientcmdapi.Context{
-		Cluster:  "drone",
-		AuthInfo: "drone",
-	}
-
-	config.CurrentContext = "drone"
-
-	clientBuilder := clientcmd.NewNonInteractiveClientConfig(*config, "drone", &clientcmd.ConfigOverrides{}, nil)
-	actualCfg, err := clientBuilder.ClientConfig()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return kubernetes.NewForConfig(actualCfg)
+	return kubernetes.NewForConfig(cfg)
 }
 
 func (p Plugin) getTemplate() (string, error) {

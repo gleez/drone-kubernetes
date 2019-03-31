@@ -1,11 +1,14 @@
 # Drone Kubernetes 
-[![Build Status](https://cloud.drone.io/api/badges/Sh4d1/drone-kubernetes/status.svg)](https://cloud.drone.io/Sh4d1/drone-kubernetes) [![](https://images.microbadger.com/badges/image/sh4d1/drone-kubernetes.svg)](https://hub.docker.com/r/sh4d1/drone-kubernetes/ "Get your own image badge on microbadger.com")
 
 Drone plugin to create/update Kubernetes resources.
 
-It uses the latest k8s go api, so it is intened to use on Kubernetes 1.9+. I can't guarantee it will work for previous versions.
+It uses the latest k8s go api, so it is intened to use on Kubernetes 1.12+. I can't guarantee it will work for previous versions.
 
-You can directly pull the image from [sh4d1/drone-kubernetes](https://hub.docker.com/r/sh4d1/drone-kubernetes/)
+You can directly pull the image from [gleez/drone-kubernetes](https://hub.docker.com/r/gleez/drone-kubernetes/)
+
+####
+Fork [Sh4d1/drone-kubernetes](https://github.com/Sh4d1/drone-kubernetes)
+
 ## Supported resources
 Currently, this plugin supports:
 * apps/v1
@@ -44,24 +47,31 @@ It is inspired by [vallard](https://github.com/vallard) and his plugin [drone-ku
 Here is how you can use this plugin:
 ```
 pipeline:
-  deploy:
-    image: sh4d1/drone-kubernetes
+- name: deploy
+  image: gleez/drone-kubernetes
+  settings:
     kubernetes_template: deployment.yml
     kubernetes_namespace: default
-    secrets: [kubernetes_server, kubernetes_cert, kubernetes_token]
+    kubernetes_incluster: false
+    kubernetes_server:
+    kubernetes_cert:
+    kubernetes_token:
 ```
 
-## Secrets
+## Secrets or Incluster Auth
+
+If you build and deploy in the same kubernetes cluster, no need to  define secrets. Change ```kubernetes_incluster true```
+
 
 You need to define these secrets before.
 ```
-$ drone secret add --image=sh4d1/drone-kubernetes -repository <your-repo> -name KUBERNETES_SERVER -value <your API server>
+$ drone secret add --image=gleez/drone-kubernetes -repository <your-repo> -name KUBERNETES_SERVER -value <your API server>
 ```
 ```
-$ drone secret add --image=sh4d1/drone-kubernetes -repository <your repo> -name KUBERNETES_CERT -value <your base64 encoded cert>
+$ drone secret add --image=gleez/drone-kubernetes -repository <your repo> -name KUBERNETES_CERT -value <your base64 encoded cert>
 ```
 ```
-$ drone secret add --image=sh4d1/drone-kubernetes -repository <your repo> -name KUBERNETES_TOKEN -value <your token>
+$ drone secret add --image=gleez/drone-kubernetes -repository <your repo> -name KUBERNETES_TOKEN -value <your token>
 ```
 
 ### How to get values of `KUBERNETES_CERT` and `KUBERNETES_TOKEN`

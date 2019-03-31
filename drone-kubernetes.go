@@ -39,6 +39,11 @@ func main() {
 			Usage:  "Kubernetes template",
 			EnvVar: "PLUGIN_KUBERNETES_TEMPLATE",
 		},
+		cli.BoolFlag{
+			Name:   "incluster",
+			Usage:  "Kubernetes incluster",
+			EnvVar: "PLUGIN_KUBERNETES_INCLUSTER",
+		},
 		cli.StringFlag{
 			Name:   "repo.owner",
 			Usage:  "repository owner",
@@ -142,6 +147,7 @@ func run(c *cli.Context) error {
 			Token:     c.String("token"),
 			Server:    c.String("server"),
 			Cert:      c.String("cert"),
+			InCluster: c.Bool("incluster"),
 			Namespace: c.String("namespace"),
 			Template:  c.String("template"),
 		},

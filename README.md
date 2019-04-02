@@ -52,15 +52,12 @@ pipeline:
   settings:
     kubernetes_template: deployment.yml
     kubernetes_namespace: default
-    kubernetes_incluster: false
     kubernetes_server:
     kubernetes_cert:
     kubernetes_token:
 ```
 
-## Secrets or Incluster Auth
-
-If you build and deploy in the same kubernetes cluster, no need to  define secrets. Change ```kubernetes_incluster true```
+## Secrets
 
 
 You need to define these secrets before.

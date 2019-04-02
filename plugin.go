@@ -1,15 +1,11 @@
 package main
 
 import (
-	"crypto/tls"
 	"encoding/base64"
 	"fmt"
-	"io/ioutil"
 	"log"
-	"net/http"
-	"net/url"
-	"path/filepath"
 	"strings"
+	"unicode"
 
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
@@ -19,9 +15,10 @@ import (
 
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+
+	"github.com/drone/drone-template-lib/template"
 )
 
 type (
@@ -54,7 +51,7 @@ type (
 		Token     string
 		Namespace string
 		Template  string
-		InCluster bool
+		Strip     bool
 	}
 
 	Plugin struct {
@@ -67,16 +64,14 @@ type (
 
 func (p Plugin) Exec() error {
 
-	if !p.Config.InCluster {
-		if p.Config.Server == "" {
-			log.Fatal("KUBERNETES_SERVER is not defined")
-		}
-		if p.Config.Token == "" {
-			log.Fatal("KUBERNETES_TOKEN is not defined")
-		}
-		if p.Config.Cert == "" {
-			log.Fatal("KUBERNETES_CERT is not defined")
-		}
+	if p.Config.Server == "" {
+		log.Fatal("KUBERNETES_SERVER is not defined")
+	}
+	if p.Config.Token == "" {
+		log.Fatal("KUBERNETES_TOKEN is not defined")
+	}
+	if p.Config.Cert == "" {
+		log.Fatal("KUBERNETES_CERT is not defined")
 	}
 
 	if p.Config.Namespace == "" {
@@ -91,10 +86,14 @@ func (p Plugin) Exec() error {
 		return err
 	}
 
-	template, err := p.getTemplate()
+	template, err := template.RenderTrim(p.Config.Template, p)
 	if err != nil {
 		return err
 	}
+
+	// strip comments
+	template = p.stripComment(template)
+
 	decode := scheme.Codecs.UniversalDeserializer().Decode
 
 	// iterate if several yalm files separated by ---
@@ -267,97 +266,41 @@ func (p Plugin) Exec() error {
 }
 
 func (p Plugin) getClient() (*kubernetes.Clientset, error) {
-	var cfg *rest.Config
-	var err error
 
-	if !p.Config.InCluster {
-		cert, err := base64.StdEncoding.DecodeString(p.Config.Cert)
-		config := clientcmdapi.NewConfig()
-		config.Clusters["drone"] = &clientcmdapi.Cluster{
-			Server:                   p.Config.Server,
-			CertificateAuthorityData: cert,
-		}
-		config.AuthInfos["drone"] = &clientcmdapi.AuthInfo{
-			Token: p.Config.Token,
-		}
+	cert, err := base64.StdEncoding.DecodeString(p.Config.Cert)
+	config := clientcmdapi.NewConfig()
+	config.Clusters["drone"] = &clientcmdapi.Cluster{
+		Server:                   p.Config.Server,
+		CertificateAuthorityData: cert,
+	}
+	config.AuthInfos["drone"] = &clientcmdapi.AuthInfo{
+		Token: p.Config.Token,
+	}
 
-		config.Contexts["drone"] = &clientcmdapi.Context{
-			Cluster:  "drone",
-			AuthInfo: "drone",
-		}
+	config.Contexts["drone"] = &clientcmdapi.Context{
+		Cluster:  "drone",
+		AuthInfo: "drone",
+	}
 
-		config.CurrentContext = "drone"
+	config.CurrentContext = "drone"
 
-		clientBuilder := clientcmd.NewNonInteractiveClientConfig(*config, "drone", &clientcmd.ConfigOverrides{}, nil)
-		cfg, err = clientBuilder.ClientConfig()
-		if err != nil {
-			log.Fatal(err)
-		}
-	} else {
-		// creates the in-cluster config
-		cfg, err = rest.InClusterConfig()
-		if err != nil {
-			log.Fatal(err)
-		}
+	clientBuilder := clientcmd.NewNonInteractiveClientConfig(*config, "drone", &clientcmd.ConfigOverrides{}, nil)
+	cfg, err := clientBuilder.ClientConfig()
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	return kubernetes.NewForConfig(cfg)
 }
 
-func (p Plugin) getTemplate() (string, error) {
+const commentChars = "#"
 
-	var template string
-	u, err := url.ParseRequestURI(p.Config.Template)
-	if err == nil {
-		switch u.Scheme {
-		case "http", "https":
-			defaultTransport := http.DefaultTransport.(*http.Transport)
-			cli := &http.Transport{
-				Proxy:                 defaultTransport.Proxy,
-				DialContext:           defaultTransport.DialContext,
-				MaxIdleConns:          defaultTransport.MaxIdleConns,
-				IdleConnTimeout:       defaultTransport.IdleConnTimeout,
-				ExpectContinueTimeout: defaultTransport.ExpectContinueTimeout,
-				TLSHandshakeTimeout:   defaultTransport.TLSHandshakeTimeout,
-				TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
-			}
-
-			client := &http.Client{Transport: cli}
-			res, err := client.Get(p.Config.Template)
-			if err != nil {
-				log.Println("Error when getting template URL")
-				return template, err
-			}
-			defer res.Body.Close()
-			out, err := ioutil.ReadAll(res.Body)
-			if err != nil {
-				log.Println("Error when reading template URL")
-				return template, err
-			}
-			template = string(out)
-		case "file":
-			fmt.Println(u.Path)
-			out, err := ioutil.ReadFile(u.Path)
-			if err != nil {
-				log.Println("Error when reading template file")
-				return template, err
-			}
-			template = string(out)
+func (p Plugin) stripComment(source string) string {
+	if p.Config.Strip {
+		if cut := strings.IndexAny(source, commentChars); cut >= 0 {
+			return strings.TrimRightFunc(source[:cut], unicode.IsSpace)
 		}
-	} else {
-		fmt.Println("file")
-		file, err := filepath.Abs(p.Config.Template)
-		if err != nil {
-			log.Println("Error when getting template path")
-			return template, err
-		}
-		out, err := ioutil.ReadFile(file)
-		if err != nil {
-			log.Println("Error when reading template file")
-			return template, err
-		}
-		template = string(out)
 	}
 
-	return RenderTrim(template, p)
+	return source
 }

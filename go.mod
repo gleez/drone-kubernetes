@@ -1,9 +1,8 @@
 module github.com/gleez/drone-kubernetes
 
 require (
-	github.com/aymerick/raymond v2.0.2+incompatible
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/drone/drone-template-lib v1.0.0 // indirect
+	github.com/drone/drone-template-lib v1.0.0
 	github.com/gogo/protobuf v1.0.0 // indirect
 	github.com/google/btree v1.0.0 // indirect
 	github.com/google/gofuzz v0.0.0-20170612174753-24818f796faf // indirect

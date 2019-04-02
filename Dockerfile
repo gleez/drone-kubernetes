@@ -7,7 +7,9 @@ WORKDIR /go/src/github.com/gleez/drone-kubernetes
 ENV GO111MODULE=on
 
 COPY . .
-RUN go build -ldflags "-linkmode external -extldflags -static" -a 
+
+# And compile the project
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-w -extldflags -static" -a -tags netgo -installsuffix netgo
 
 # And compile the project
 # RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -a -tags netgo -ldflags '-w -extldflags "-static"'

@@ -92,7 +92,7 @@ func (p Plugin) Exec() error {
 	}
 
 	// strip comments
-	template = p.stripComment(template)
+	//template = p.stripComment(template)
 
 	decode := scheme.Codecs.UniversalDeserializer().Decode
 

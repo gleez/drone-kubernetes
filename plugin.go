@@ -3,7 +3,10 @@ package main
 import (
 	"encoding/base64"
 	"fmt"
+	"io/ioutil"
 	"log"
+	"net/url"
+	"path/filepath"
 	"strings"
 	"unicode"
 
@@ -65,8 +68,10 @@ type (
 func (p Plugin) Exec() error {
 
 	if p.Config.Server == "" {
-		log.Fatal("KUBERNETES_SERVER is not defined")
+		p.Config.Server = "https://kubernetes.default.svc.cluster.local"
+		log.Println("KUBERNETES_SERVER is not defined using https://kubernetes.default.svc.cluster.local")
 	}
+
 	if p.Config.Token == "" {
 		log.Fatal("KUBERNETES_TOKEN is not defined")
 	}
@@ -86,18 +91,23 @@ func (p Plugin) Exec() error {
 		return err
 	}
 
-	template, err := template.RenderTrim(p.Config.Template, p)
+	template, err := p.getTemplate()
 	if err != nil {
 		return err
 	}
 
 	// strip comments
-	//template = p.stripComment(template)
+	template = p.stripComment(template)
 
 	decode := scheme.Codecs.UniversalDeserializer().Decode
 
 	// iterate if several yalm files separated by ---
 	for _, s := range strings.Split(template, "---") {
+		if s == "\n" || s == "" {
+			// ignore empty cases
+			continue
+		}
+
 		obj, _, err := decode([]byte(s), nil, nil)
 		if err != nil {
 			log.Println("Error when decoding template YAML")
@@ -291,6 +301,35 @@ func (p Plugin) getClient() (*kubernetes.Clientset, error) {
 	}
 
 	return kubernetes.NewForConfig(cfg)
+}
+
+func (p Plugin) getTemplate() (string, error) {
+	var tepl string
+
+	if _, err := url.ParseRequestURI(p.Config.Template); err != nil {
+		fmt.Printf("file %s \n", p.Config.Template)
+
+		file, err := filepath.Abs(p.Config.Template)
+		if err != nil {
+			log.Println("Error when getting template path")
+			return tepl, err
+		}
+		out, err := ioutil.ReadFile(file)
+		if err != nil {
+			log.Println("Error when reading template file")
+			return tepl, err
+		}
+
+		return strings.Trim(string(out), " \n"), nil
+	}
+
+	temp, err := template.RenderTrim(p.Config.Template, p)
+	if err != nil {
+		log.Println("Error when render template")
+		return tepl, err
+	}
+
+	return temp, nil
 }
 
 const commentChars = "#"

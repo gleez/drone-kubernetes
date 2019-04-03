@@ -30,17 +30,20 @@ type (
 	}
 
 	Build struct {
-		Tag     string
-		Event   string
-		Number  int
-		Commit  string
-		Ref     string
-		Branch  string
-		Author  string
-		Status  string
-		Link    string
-		Started int64
-		Created int64
+		Tag      string
+		Event    string
+		Number   int
+		Commit   string
+		Ref      string
+		Branch   string
+		Author   string
+		Pull     string
+		Message  string
+		DeployTo string
+		Status   string
+		Link     string
+		Started  int64
+		Created  int64
 	}
 
 	Job struct {
@@ -309,18 +312,9 @@ func (p Plugin) getTemplate() (string, error) {
 	if _, err := url.ParseRequestURI(p.Config.Template); err != nil {
 		log.Printf("Template file %s \n", p.Config.Template)
 
-		// file, err := filepath.Abs(p.Config.Template)
-		// if err != nil {
-		// 	log.Println("Error when getting template path")
-		// 	return tepl, err
-		// }
-
-		// p.Config.Template = fmt.Sprintf("file://%s", file)
-
 		raw, err := ioutil.ReadFile(p.Config.Template)
-
 		if err != nil {
-			log.Println(err, "failed to read template")
+			log.Println("Error failed to read template")
 			return tepl, err
 		}
 

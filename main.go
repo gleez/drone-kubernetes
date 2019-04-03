@@ -7,6 +7,11 @@ import (
 	"github.com/urfave/cli"
 )
 
+var (
+	version = "0.0.0"
+	build   = "0"
+)
+
 func main() {
 
 	app := cli.NewApp()
@@ -77,6 +82,16 @@ func main() {
 			EnvVar: "DRONE_COMMIT_AUTHOR",
 		},
 		cli.StringFlag{
+			Name:   "commit.pull",
+			Usage:  "git pull request",
+			EnvVar: "DRONE_PULL_REQUEST",
+		},
+		cli.StringFlag{
+			Name:   "commit.message",
+			Usage:  "commit message",
+			EnvVar: "DRONE_COMMIT_MESSAGE",
+		},
+		cli.StringFlag{
 			Name:   "build.event",
 			Value:  "push",
 			Usage:  "build event",
@@ -113,6 +128,16 @@ func main() {
 			Usage:  "build tag",
 			EnvVar: "DRONE_TAG",
 		},
+		cli.StringFlag{
+			Name:   "build.deployTo",
+			Usage:  "environment deployed to",
+			EnvVar: "DRONE_DEPLOY_TO",
+		},
+		cli.Int64Flag{
+			Name:   "job.started",
+			Usage:  "job started",
+			EnvVar: "DRONE_JOB_STARTED",
+		},
 	}
 
 	if err := app.Run(os.Args); err != nil {
@@ -128,17 +153,20 @@ func run(c *cli.Context) error {
 			Name:  c.String("repo.name"),
 		},
 		Build: Build{
-			Tag:     c.String("build.tag"),
-			Number:  c.Int("build.number"),
-			Event:   c.String("build.event"),
-			Status:  c.String("build.status"),
-			Commit:  c.String("commit.sha"),
-			Ref:     c.String("commit.ref"),
-			Branch:  c.String("commit.branch"),
-			Author:  c.String("commit.author"),
-			Link:    c.String("build.link"),
-			Started: c.Int64("build.started"),
-			Created: c.Int64("build.created"),
+			Tag:      c.String("build.tag"),
+			Number:   c.Int("build.number"),
+			Event:    c.String("build.event"),
+			Status:   c.String("build.status"),
+			Commit:   c.String("commit.sha"),
+			Ref:      c.String("commit.ref"),
+			Branch:   c.String("commit.branch"),
+			Author:   c.String("commit.author"),
+			Pull:     c.String("commit.pull"),
+			Message:  c.String("commit.message"),
+			DeployTo: c.String("build.deployTo"),
+			Link:     c.String("build.link"),
+			Started:  c.Int64("build.started"),
+			Created:  c.Int64("build.created"),
 		},
 		Job: Job{
 			Started: c.Int64("job.started"),

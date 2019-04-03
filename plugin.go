@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"log"
 	"net/url"
-	"path/filepath"
 	"strings"
 	"unicode"
 
@@ -306,21 +305,26 @@ func (p Plugin) getClient() (*kubernetes.Clientset, error) {
 func (p Plugin) getTemplate() (string, error) {
 	var tepl string
 
+	// check if its localfile convert to file protocol for drone template render
 	if _, err := url.ParseRequestURI(p.Config.Template); err != nil {
-		fmt.Printf("file %s \n", p.Config.Template)
+		log.Printf("Template file %s \n", p.Config.Template)
 
-		file, err := filepath.Abs(p.Config.Template)
+		// file, err := filepath.Abs(p.Config.Template)
+		// if err != nil {
+		// 	log.Println("Error when getting template path")
+		// 	return tepl, err
+		// }
+
+		// p.Config.Template = fmt.Sprintf("file://%s", file)
+
+		raw, err := ioutil.ReadFile(p.Config.Template)
+
 		if err != nil {
-			log.Println("Error when getting template path")
+			log.Println(err, "failed to read template")
 			return tepl, err
 		}
-		out, err := ioutil.ReadFile(file)
-		if err != nil {
-			log.Println("Error when reading template file")
-			return tepl, err
-		}
 
-		return strings.Trim(string(out), " \n"), nil
+		p.Config.Template = string(raw)
 	}
 
 	temp, err := template.RenderTrim(p.Config.Template, p)
